@@ -21,7 +21,7 @@
   "How can you delete a specific node in Neo4j using Cypher?": "Use the MATCH clause to find the node and then DELETE it",
   "How can you eliminate duplicate rows in the results of a Cypher query?": "Using the DISTINCT keyword",
   "How can optional matches be useful in a Neo4j query?": "Optional matches allow you to specify patterns that may or may not exist in the graph.",
-  "Given the following domain question.": ["Purchased"],
+  "Given the following domain question.": ["Product"],
   "What are some things to look for as red flags to investigate in a Cypher query plan?": ["AllNodesScan", "NodeByLabelScan with a lot of DB hits", "Placement of eager operators"],
   "True or False - You can create an index on nodes or relationships.": "True",
   "Which of the following statements is correct?": "Neo4j allows for an optional schema",
