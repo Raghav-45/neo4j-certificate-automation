@@ -3,6 +3,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.support.ui import Select
 import time
 import os
 import random
@@ -92,6 +93,8 @@ def complete_certification_test(driver, email):
             radio_options = driver.find_elements(By.XPATH, "//input[@name='answers' and @type='radio']")
             # Check for checkboxes (select all that apply)
             checkbox_options = driver.find_elements(By.XPATH, "//input[@name='answers' and @type='checkbox']")
+            # Check for dropdown (select one from options)
+            dropdown = driver.find_elements(By.XPATH, "//select[@name='answers']")
 
             if radio_options:
                 # Handle multiple-choice (select one)
@@ -105,6 +108,17 @@ def complete_certification_test(driver, email):
                 for option in selected_options:
                     option.click()
                 print(f"Selected {num_to_select} checkbox options for question {question_num}")
+            elif dropdown:
+                # Handle dropdown (select one option)
+                select = Select(dropdown[0])  # Use Selenium's Select class
+                options = [opt.get_attribute("value") for opt in select.options if opt.get_attribute("value")]  # Exclude empty option
+                if options:
+                    selected_value = random.choice(options)
+                    select.select_by_value(selected_value)
+                    print(f"Selected dropdown option '{selected_value}' for question {question_num}")
+                else:
+                    print(f"No valid dropdown options found for question {question_num}")
+                    break
             else:
                 print(f"No answer options found for question {question_num}.")
                 break
