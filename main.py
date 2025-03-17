@@ -6,7 +6,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import Select
 import time
 import os
-import random
+import json
 
 def generate_dot_trick_emails(email: str, limit: int = 10):
     """
@@ -36,6 +36,10 @@ def generate_dot_trick_emails(email: str, limit: int = 10):
     result_emails = [f"{variation}@{domain}" for variation in unique_variations[:limit]]
     
     return result_emails
+
+# Load answers from JSON file
+with open("answers.json", "r") as f:
+    ANSWERS = json.load(f)
 
 # Step 1: Generate and save email variations
 base_email = "adi4545aditya@gmail.com"  # Hardcode your base Gmail address here
@@ -81,59 +85,53 @@ def login(driver, email, password):
     return complete_certification_test(driver, email)
 
 def complete_certification_test(driver, email):
-    # Navigate to the certification test page
     driver.get("https://graphacademy.neo4j.com/certifications/neo4j-certification/enrol/")
-    time.sleep(5)  # Wait for the page to load (adjust if needed)
+    time.sleep(5)
 
-    # Loop through 80 questions
     for question_num in range(1, 81):
         print(f"Answering question {question_num} for {email}...")
         try:
-            # Check for radio buttons (multiple-choice)
+            # Get question text
+            question_elem = driver.find_element(By.XPATH, "//div[@id='content']/p")
+            question_text = question_elem.text.strip()
+
+            # Look up answer in ANSWERS
+            answer = ANSWERS.get(question_text, None)
+            if not answer:
+                print(f"No answer found for '{question_text}', skipping or using default...")
+                continue  # Skip if no answer found (or implement fallback)
+
+            # Check question type
             radio_options = driver.find_elements(By.XPATH, "//input[@name='answers' and @type='radio']")
-            # Check for checkboxes (select all that apply)
             checkbox_options = driver.find_elements(By.XPATH, "//input[@name='answers' and @type='checkbox']")
-            # Check for dropdown (select one from options)
             dropdown = driver.find_elements(By.XPATH, "//select[@name='answers']")
-            # Check for text input (fill in the blank)
-            text_input = driver.find_elements(By.XPATH, "//input[@name='answers']")  # Broader locator
+            text_input = driver.find_elements(By.XPATH, "//input[@name='answers']")
 
             if radio_options:
-                # Handle multiple-choice (select one)
-                selected_option = random.choice(radio_options)
-                selected_option.click()
-                print(f"Selected radio option for question {question_num}")
+                for option in radio_options:
+                    value = option.get_attribute("value")
+                    if value == answer:
+                        option.click()
+                        print(f"Selected radio option '{value}'")
+                        break
             elif checkbox_options:
-                # Handle select all that apply (select random subset)
-                num_to_select = random.randint(1, len(checkbox_options))  # Select 1 to all options
-                selected_options = random.sample(checkbox_options, num_to_select)
-                for option in selected_options:
-                    option.click()
-                print(f"Selected {num_to_select} checkbox options for question {question_num}")
+                if isinstance(answer, list):
+                    for option in checkbox_options:
+                        value = option.get_attribute("value")
+                        if value in answer:
+                            option.click()
+                            print(f"Selected checkbox option '{value}'")
             elif dropdown:
-                # Handle dropdown (select one option)
-                select = Select(dropdown[0])  # Use Selenium's Select class
-                options = [opt.get_attribute("value") for opt in select.options if opt.get_attribute("value")]  # Exclude empty option
-                if options:
-                    selected_value = random.choice(options)
-                    select.select_by_value(selected_value)
-                    print(f"Selected dropdown option '{selected_value}' for question {question_num}")
-                else:
-                    print(f"No valid dropdown options found for question {question_num}")
-                    break
+                select = Select(dropdown[0])
+                select.select_by_value(answer)
+                print(f"Selected dropdown option '{answer}'")
             elif text_input:
                 text_field = text_input[0]
-                answer = "p.name"  # Placeholder; adjust based on context if known
-                text_field.clear()  # Clear any existing text
+                text_field.clear()
                 text_field.send_keys(answer)
-                print(f"Entered text '{answer}' for question {question_num}")
-            else:
-                print(f"No answer options found for question {question_num}.")
-                break
+                print(f"Entered text '{answer}'")
 
-            time.sleep(1)  # Delay to ensure the button enables
-
-            # Find and click the "Submit Answer" button
+            time.sleep(1)
             submit_button = driver.find_element(By.XPATH, "//button[contains(@class, 'btn--primary') and @type='submit']")
             if submit_button.is_enabled():
                 submit_button.click()
@@ -141,11 +139,11 @@ def complete_certification_test(driver, email):
             else:
                 print(f"Submit button not enabled for question {question_num}")
                 break
-            time.sleep(2)  # Wait for the next question to load
+            time.sleep(2)
 
         except Exception as e:
             print(f"Error on question {question_num} for {email}: {e}")
-            break  # Exit loop if something goes wrong
+            break
 
     print(f"Completed certification test for {email}.")
     return True
@@ -154,7 +152,6 @@ def complete_certification_test(driver, email):
 existing_accounts = read_accounts(accounts_file)
 
 if existing_accounts:
-    # Step 3: Login with existing accounts and complete the test
     for email, pwd in existing_accounts.items():
         chrome_options = Options()
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
@@ -166,7 +163,6 @@ if existing_accounts:
             driver.quit()
             time.sleep(2)
 else:
-    # Step 2: Create new accounts if accounts.txt doesn’t exist or is empty
     for email in email_variations:
         chrome_options = Options()
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
