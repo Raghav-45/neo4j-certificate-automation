@@ -88,21 +88,32 @@ def complete_certification_test(driver, email):
     for question_num in range(1, 81):
         print(f"Answering question {question_num} for {email}...")
         try:
-            # Find all answer options (radio buttons with name="answers")
-            answer_options = driver.find_elements(By.XPATH, "//input[@name='answers' and @type='radio']")
+            # Check for radio buttons (multiple-choice)
+            radio_options = driver.find_elements(By.XPATH, "//input[@name='answers' and @type='radio']")
+            # Check for checkboxes (select all that apply)
+            checkbox_options = driver.find_elements(By.XPATH, "//input[@name='answers' and @type='checkbox']")
 
-            # Randomly select one option
-            if answer_options:
-                selected_option = random.choice(answer_options)
+            if radio_options:
+                # Handle multiple-choice (select one)
+                selected_option = random.choice(radio_options)
                 selected_option.click()
-                time.sleep(1)  # Small delay to simulate human interaction
+                print(f"Selected radio option for question {question_num}")
+            elif checkbox_options:
+                # Handle select all that apply (select random subset)
+                num_to_select = random.randint(1, len(checkbox_options))  # Select 1 to all options
+                selected_options = random.sample(checkbox_options, num_to_select)
+                for option in selected_options:
+                    option.click()
+                print(f"Selected {num_to_select} checkbox options for question {question_num}")
             else:
                 print(f"No answer options found for question {question_num}.")
                 break
 
-            # Find and click the "Next" or "Submit" button (adjust locator)
-            next_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Next')]")  # Placeholder
-            next_button.click()
+            time.sleep(1)  # Delay to ensure the button enables
+
+            # Find and click the "Submit Answer" button
+            submit_button = driver.find_element(By.XPATH, "//button[contains(@class, 'btn--primary') and @type='submit']")
+            submit_button.click()
             time.sleep(2)  # Wait for the next question to load
 
         except Exception as e:
