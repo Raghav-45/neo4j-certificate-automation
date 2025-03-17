@@ -95,6 +95,8 @@ def complete_certification_test(driver, email):
             checkbox_options = driver.find_elements(By.XPATH, "//input[@name='answers' and @type='checkbox']")
             # Check for dropdown (select one from options)
             dropdown = driver.find_elements(By.XPATH, "//select[@name='answers']")
+            # Check for text input (fill in the blank)
+            text_input = driver.find_elements(By.XPATH, "//input[@name='answers']")  # Broader locator
 
             if radio_options:
                 # Handle multiple-choice (select one)
@@ -119,6 +121,12 @@ def complete_certification_test(driver, email):
                 else:
                     print(f"No valid dropdown options found for question {question_num}")
                     break
+            elif text_input:
+                text_field = text_input[0]
+                answer = "p.name"  # Placeholder; adjust based on context if known
+                text_field.clear()  # Clear any existing text
+                text_field.send_keys(answer)
+                print(f"Entered text '{answer}' for question {question_num}")
             else:
                 print(f"No answer options found for question {question_num}.")
                 break
@@ -127,7 +135,12 @@ def complete_certification_test(driver, email):
 
             # Find and click the "Submit Answer" button
             submit_button = driver.find_element(By.XPATH, "//button[contains(@class, 'btn--primary') and @type='submit']")
-            submit_button.click()
+            if submit_button.is_enabled():
+                submit_button.click()
+                print(f"Submitted answer for question {question_num}")
+            else:
+                print(f"Submit button not enabled for question {question_num}")
+                break
             time.sleep(2)  # Wait for the next question to load
 
         except Exception as e:
