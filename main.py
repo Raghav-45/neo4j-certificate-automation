@@ -7,6 +7,7 @@ from selenium.webdriver.support.ui import Select
 import time
 import os
 import json
+from fuzzywuzzy import fuzz, process
 
 def generate_dot_trick_emails(email: str, limit: int = 10):
     """
@@ -95,11 +96,17 @@ def complete_certification_test(driver, email):
             question_elem = driver.find_element(By.XPATH, "//div[@id='content']/p")
             question_text = question_elem.text.strip()
 
-            # Look up answer in ANSWERS
+            # Look up answer with fuzzy matching
             answer = ANSWERS.get(question_text, None)
             if not answer:
-                print(f"No answer found for '{question_text}', skipping or using default...")
-                continue  # Skip if no answer found (or implement fallback)
+                # Fuzzy match if exact match fails
+                best_match, score = process.extractOne(question_text, ANSWERS.keys(), scorer=fuzz.token_sort_ratio)
+                if score >= 85:  # Threshold for similarity
+                    answer = ANSWERS[best_match]
+                    print(f"Fuzzy matched '{question_text}' to '{best_match}' (score: {score})")
+                else:
+                    print(f"No close match found for '{question_text}' (best score: {score}), skipping...")
+                    continue  # Skip if no good match
 
             # Check question type
             radio_options = driver.find_elements(By.XPATH, "//input[@name='answers' and @type='radio']")
@@ -131,7 +138,7 @@ def complete_certification_test(driver, email):
                 text_field.send_keys(answer)
                 print(f"Entered text '{answer}'")
 
-            time.sleep(1)
+            time.sleep(3)
             submit_button = driver.find_element(By.XPATH, "//button[contains(@class, 'btn--primary') and @type='submit']")
             if submit_button.is_enabled():
                 submit_button.click()
