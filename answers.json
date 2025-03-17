@@ -26,7 +26,7 @@
   "In a complex data import scenario involving both nodes and relationships, which of the following sequence of steps is recommended?": "Import nodes first, then relationships",
   "What is the default port for connecting to a Neo4j database using the driver?": "7687",
   "What is the role of a driver in Neo4j?": "To establish a connection with the Neo4j database",
-  "Which of the following protocols are valid to create a secure connection to Neo4j using the Driver?": ["neo4j+s", "neo4j+ssc"],
+  "Which of the following protocols are valid to create a secure connection to Neo4j using the Driver?": ["bolt+s", "neo4j+s", "neo4j+ssc"],
   "What statement best describes index-free adjacency for a Neo4j database?": "Nodes and their relationships are stored as pointers so that access is very fast without the need for an index to traverse nodes.",
   "What protocol do the official Neo4j drivers use to access the Neo4j database?": "Bolt",
   "Which of the following Cypher statements would you use to count the number of nodes with the label Person?": ["MATCH (n:Person) RETURN count(n)"],
@@ -59,7 +59,7 @@
   "Complete the following Cypher statement to instruct Neo4j that the first row in the CSV file contains headers.": "WITH HEADERS",
   "When using a language driver, a statement of results comprises a stream of…": "records",
   "When establishing a driver connection using the neo4j+ssc, which of the following will occur?": "The driver will establish an encrypted connection but it will not verify the SSL certificate",
-  "Complete the following Python code to verify the database credentials passed to the GraphDatabase.driver() method are correct.": "verify()",
+  "Complete the following Python code to verify the database credentials passed to the GraphDatabase.driver() method are correct.": "verify_authentication()",
   "To take advantage of the Query cache, what should you do?": ["Use parameters in your queries."],
   "Which method of traversal behavior does Neo4j use during a Cypher query?": "depth-first",
   "The following Cypher statement will match all nodes in the database and return their relationships regardless, resulting in a cartesian product. Each node will be returned as both n and m and each relationship will be returned twice.": ["Define a label for one of the nodes to narrow down the initial search area"],
@@ -74,7 +74,7 @@
   "What makes fulltext and vector indexes different from other indexes in Neo4j?": "They must be queried by a calling a procedure.",
   "Complete the Cypher statement below to create a Vector index on the :Movie.embedding property.": "CREATE VECTOR INDEX",
   "Complete the Cypher statement below to execute the LOAD CSV command in batches of 1000 rows.": "IN TRANSACTIONS OF 1000 ROWS",
-  "Complete the following Python code to execute a one-off Cypher statement and consume the results as a Pandas DataFrame.": "to_df",
+  "Complete the following Python code to execute a one-off Cypher statement and consume the results as a Pandas DataFrame.": "execute_query",
   "When using a language driver, which forms of transaction functions will be automatically retried on failure?": "Transaction functions",
   "True or False - Neo4j uses indexes to store relationships between nodes.": "False"
 }
