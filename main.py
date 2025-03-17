@@ -4,6 +4,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 import time
+import os
 
 def generate_dot_trick_emails(email: str, limit: int = 10):
     """
@@ -20,7 +21,6 @@ def generate_dot_trick_emails(email: str, limit: int = 10):
     if domain != "gmail.com":
         raise ValueError("This trick only works with Gmail addresses")
 
-    # Generate all possible combinations of the local part with dots
     def insert_dots(s):
         result = []
         n = len(s)
@@ -35,8 +35,6 @@ def generate_dot_trick_emails(email: str, limit: int = 10):
 
     all_variations = [local] + insert_dots(local)
     unique_variations = list(dict.fromkeys(all_variations))  # Remove duplicates
-
-    # Limit the results
     result_emails = [f"{variation}@{domain}" for variation in unique_variations[:limit]]
     
     return result_emails
@@ -51,56 +49,98 @@ with open("emails.txt", "w") as email_file:
         email_file.write(f"{email}\n")
 print(f"Generated {len(email_variations)} email variations and saved to emails.txt")
 
-# Step 2: Automate account creation with each email
+# Step 2 & 3: Check if accounts.txt exists and decide between login or signup
 password = "Iloveindia123@"  # Hardcode your password here
+accounts_file = "accounts.txt"
 
-for email in email_variations:
-    # Set up Chrome options (optional: headless mode)
-    chrome_options = Options()
-    # chrome_options.add_argument("--headless")  # Uncomment for no browser UI
+# Function to read accounts from accounts.txt
+def read_accounts(file_path):
+    accounts = {}
+    if os.path.exists(file_path):
+        with open(file_path, "r") as file:
+            for line in file:
+                if "Email:" in line and "Password:" in line:
+                    email = line.split("Email: ")[1].split(",")[0].strip()
+                    pwd = line.split("Password: ")[1].strip()
+                    accounts[email] = pwd
+    return accounts
 
-    # Initialize a new WebDriver instance for each iteration
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+# Function to login with given credentials (two-step process)
+def login(driver, email, password):
+    print(f"Attempting login with {email}...")
+    driver.get("https://graphacademy.neo4j.com/login/?return=/")
+    time.sleep(3)  # Wait for page load
 
-    try:
-        print(f"Attempting signup with {email}...")
-        
-        # Navigate to the Neo4j login/signup page
-        driver.get("https://graphacademy.neo4j.com/login/?return=/")
-        time.sleep(3)  # Wait for page load
+    # Step 1: Enter email and submit
+    email_field = driver.find_element(By.ID, "username")
+    email_submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
+    email_field.send_keys(email)
+    email_submit_button.click()
+    time.sleep(1)  # Wait for password field to appear
 
-        # Find and click the "Sign Up" link/button
-        signup_link = driver.find_element(By.LINK_TEXT, "Sign up")
-        signup_link.click()
-        time.sleep(2)  # Wait for signup form to load
+    # Step 2: Enter password and submit
+    password_field = driver.find_element(By.ID, "password")
+    password_submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
+    password_field.send_keys(password)
+    password_submit_button.click()
+    time.sleep(3)  # Wait for login to complete
 
-        # Fill out the email field and submit
-        email_field = driver.find_element(By.ID, "email")
-        email_submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
-        email_field.send_keys(email)
-        email_submit_button.click()
-        time.sleep(3)  # Wait for password field to appear
+    driver.get("https://graphacademy.neo4j.com/certifications/neo4j-certification/enrol/")
+    time.sleep(30)  # Wait for certifications page
+    print(f"Logged in with {email} and navigated to certifications page.")
 
-        # Fill out the password field and submit
-        password_field = driver.find_element(By.ID, "password")
-        password_submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
-        password_field.send_keys(password)
-        password_submit_button.click()
-        time.sleep(3)  # Wait for signup confirmation or redirect
+# Check if accounts.txt exists and has data
+existing_accounts = read_accounts(accounts_file)
 
-        # Save the account details to accounts.txt in append mode
-        with open("accounts.txt", "a") as account_file:
-            account_file.write(f"Email: {email}, Password: {password}\n")
-        print(f"Account created for {email} and saved to accounts.txt")
+if existing_accounts:
+    # Step 3: Login with existing accounts
+    for email, pwd in existing_accounts.items():
+        chrome_options = Options()
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+        try:
+            login(driver, email, pwd)
+        except Exception as e:
+            print(f"Login failed for {email}: {e}")
+        finally:
+            driver.quit()
+            time.sleep(2)  # Delay before next login
+else:
+    # Step 2: Create new accounts if accounts.txt doesn’t exist or is empty
+    for email in email_variations:
+        chrome_options = Options()
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
-        # Navigate to the certifications page (optional)
-        driver.get("https://graphacademy.neo4j.com/certifications")
-        time.sleep(3)  # Wait for certifications page to load
+        try:
+            print(f"Attempting signup with {email}...")
+            driver.get("https://graphacademy.neo4j.com/login/?return=/")
+            time.sleep(3)  # Wait for page load
 
-    except Exception as e:
-        print(f"An error occurred with {email}: {e}")
+            signup_link = driver.find_element(By.LINK_TEXT, "Sign up")
+            signup_link.click()
+            time.sleep(2)  # Wait for signup form to load
 
-    finally:
-        # Close the browser session after each iteration
-        driver.quit()
-        time.sleep(2)  # Small delay before starting the next session
+            email_field = driver.find_element(By.ID, "email")
+            email_submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
+            email_field.send_keys(email)
+            email_submit_button.click()
+            time.sleep(3)  # Wait for password field
+
+            password_field = driver.find_element(By.ID, "password")
+            password_submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
+            password_field.send_keys(password)
+            password_submit_button.click()
+            time.sleep(3)  # Wait for signup confirmation
+
+            with open(accounts_file, "a") as account_file:
+                account_file.write(f"Email: {email}, Password: {password}\n")
+            print(f"Account created for {email} and saved to accounts.txt")
+
+            driver.get("https://graphacademy.neo4j.com/certifications")
+            time.sleep(3)  # Wait for certifications page
+
+        except Exception as e:
+            print(f"An error occurred with {email}: {e}")
+
+        finally:
+            driver.quit()
+            time.sleep(2)  # Delay before next iteration
