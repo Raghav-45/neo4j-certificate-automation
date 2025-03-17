@@ -8,6 +8,12 @@ import time
 import os
 import json
 from fuzzywuzzy import fuzz, process
+import random
+import logging
+
+# Set up logging to a file
+logging.basicConfig(filename='log.txt', level=logging.INFO, 
+                    format='%(asctime)s - %(message)s', filemode='a')
 
 def generate_dot_trick_emails(email: str, limit: int = 10):
     """
@@ -85,6 +91,33 @@ def login(driver, email, password):
 
     return complete_certification_test(driver, email)
 
+def select_random_answer(radio_options, checkbox_options, dropdown, text_input):
+    """Select a random answer based on question type."""
+    if radio_options:
+        option = random.choice(radio_options)
+        option.click()
+        return option.get_attribute("value")
+    elif checkbox_options:
+        num_to_select = random.randint(1, len(checkbox_options))
+        selected = random.sample(checkbox_options, num_to_select)
+        for option in selected:
+            option.click()
+        return [opt.get_attribute("value") for opt in selected]
+    elif dropdown:
+        select = Select(dropdown[0])
+        options = [opt.get_attribute("value") for opt in select.options if opt.get_attribute("value")]
+        if options:
+            value = random.choice(options)
+            select.select_by_value(value)
+            return value
+    elif text_input:
+        text_field = text_input[0]
+        text_field.clear()
+        random_answer = "random_answer"  # Placeholder for text input
+        text_field.send_keys(random_answer)
+        return random_answer
+    return None
+
 def complete_certification_test(driver, email):
     driver.get("https://graphacademy.neo4j.com/certifications/neo4j-certification/enrol/")
     time.sleep(5)
@@ -105,8 +138,25 @@ def complete_certification_test(driver, email):
                     answer = ANSWERS[best_match]
                     print(f"Fuzzy matched '{question_text}' to '{best_match}' (score: {score})")
                 else:
-                    print(f"No close match found for '{question_text}' (best score: {score}), skipping...")
-                    continue  # Skip if no good match
+                    print(f"No close match found for '{question_text}' (best score: {score}), using random answer...")
+                    logging.info(f"Question not in answers.json: '{question_text}' - Selecting random answer")
+                    # Check question type for random selection
+                    radio_options = driver.find_elements(By.XPATH, "//input[@name='answers' and @type='radio']")
+                    checkbox_options = driver.find_elements(By.XPATH, "//input[@name='answers' and @type='checkbox']")
+                    dropdown = driver.find_elements(By.XPATH, "//select[@name='answers']")
+                    text_input = driver.find_elements(By.XPATH, "//input[@name='answers']")
+                    random_answer = select_random_answer(radio_options, checkbox_options, dropdown, text_input)
+                    logging.info(f"Random answer selected: {random_answer}")
+                    time.sleep(1)
+                    submit_button = driver.find_element(By.XPATH, "//button[contains(@class, 'btn--primary') and @type='submit']")
+                    if submit_button.is_enabled():
+                        submit_button.click()
+                        print(f"Submitted random answer for question {question_num}")
+                    else:
+                        print(f"Submit button not enabled for question {question_num}")
+                        break
+                    time.sleep(2)
+                    continue
 
             # Check question type
             radio_options = driver.find_elements(By.XPATH, "//input[@name='answers' and @type='radio']")
@@ -114,31 +164,49 @@ def complete_certification_test(driver, email):
             dropdown = driver.find_elements(By.XPATH, "//select[@name='answers']")
             text_input = driver.find_elements(By.XPATH, "//input[@name='answers']")
 
-            if radio_options:
-                for option in radio_options:
-                    value = option.get_attribute("value")
-                    if value == answer:
-                        option.click()
-                        print(f"Selected radio option '{value}'")
-                        break
-            elif checkbox_options:
-                if isinstance(answer, list):
+            # Validate answer type matches question type
+            if radio_options and not isinstance(answer, str):
+                logging.info(f"Answer type mismatch for '{question_text}': Expected string, got {type(answer).__name__} - Using random answer")
+                random_answer = select_random_answer(radio_options, [], [], [])
+                print(f"Selected random radio option '{random_answer}' due to type mismatch")
+            elif checkbox_options and not isinstance(answer, list):
+                logging.info(f"Answer type mismatch for '{question_text}': Expected list, got {type(answer).__name__} - Using random answer")
+                random_answer = select_random_answer([], checkbox_options, [], [])
+                print(f"Selected random checkbox options '{random_answer}' due to type mismatch")
+            elif dropdown and not isinstance(answer, str):
+                logging.info(f"Answer type mismatch for '{question_text}': Expected string, got {type(answer).__name__} - Using random answer")
+                random_answer = select_random_answer([], [], dropdown, [])
+                print(f"Selected random dropdown option '{random_answer}' due to type mismatch")
+            elif text_input and not isinstance(answer, str):
+                logging.info(f"Answer type mismatch for '{question_text}': Expected string, got {type(answer).__name__} - Using random answer")
+                random_answer = select_random_answer([], [], [], text_input)
+                print(f"Entered random text '{random_answer}' due to type mismatch")
+            else:
+                # Proceed with provided answer
+                if radio_options:
+                    for option in radio_options:
+                        value = option.get_attribute("value")
+                        if value == answer:
+                            option.click()
+                            print(f"Selected radio option '{value}'")
+                            break
+                elif checkbox_options:
                     for option in checkbox_options:
                         value = option.get_attribute("value")
                         if value in answer:
                             option.click()
                             print(f"Selected checkbox option '{value}'")
-            elif dropdown:
-                select = Select(dropdown[0])
-                select.select_by_value(answer)
-                print(f"Selected dropdown option '{answer}'")
-            elif text_input:
-                text_field = text_input[0]
-                text_field.clear()
-                text_field.send_keys(answer)
-                print(f"Entered text '{answer}'")
+                elif dropdown:
+                    select = Select(dropdown[0])
+                    select.select_by_value(answer)
+                    print(f"Selected dropdown option '{answer}'")
+                elif text_input:
+                    text_field = text_input[0]
+                    text_field.clear()
+                    text_field.send_keys(answer)
+                    print(f"Entered text '{answer}'")
 
-            time.sleep(3)
+            time.sleep(1)
             submit_button = driver.find_element(By.XPATH, "//button[contains(@class, 'btn--primary') and @type='submit']")
             if submit_button.is_enabled():
                 submit_button.click()
