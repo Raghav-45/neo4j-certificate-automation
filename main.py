@@ -45,7 +45,7 @@ def generate_dot_trick_emails(email: str, limit: int = 10):
     return result_emails
 
 # Load answers from JSON file
-with open("answers.json", "r") as f:
+with open("answers.json", "r", encoding='utf-8') as f:
     ANSWERS = json.load(f)
 
 # Step 1: Generate and save email variations
@@ -91,8 +91,21 @@ def login(driver, email, password):
 
     return complete_certification_test(driver, email)
 
+def get_available_options(radio_options, checkbox_options, dropdown, text_input):
+    """Retrieve the full text of available options for the question from <p> tags."""
+    if radio_options:
+        return [opt.find_element(By.XPATH, "./following-sibling::p").text.strip() for opt in radio_options]
+    elif checkbox_options:
+        return [opt.find_element(By.XPATH, "./following-sibling::p").text.strip() for opt in checkbox_options]
+    elif dropdown:
+        select = Select(dropdown[0])
+        return [opt.text.strip() for opt in select.options if opt.get_attribute("value")]
+    elif text_input:
+        return ["text input"]  # Placeholder since text inputs don’t have predefined options
+    return []
+
 def select_random_answer(radio_options, checkbox_options, dropdown, text_input):
-    """Select a random answer based on question type."""
+    """Select a random answer based on question type and return its value."""
     if radio_options:
         option = random.choice(radio_options)
         option.click()
@@ -105,11 +118,11 @@ def select_random_answer(radio_options, checkbox_options, dropdown, text_input):
         return [opt.get_attribute("value") for opt in selected]
     elif dropdown:
         select = Select(dropdown[0])
-        options = [opt.get_attribute("value") for opt in select.options if opt.get_attribute("value")]
+        options = [opt for opt in select.options if opt.get_attribute("value")]
         if options:
-            value = random.choice(options)
-            select.select_by_value(value)
-            return value
+            option = random.choice(options)
+            select.select_by_value(option.get_attribute("value"))
+            return option.get_attribute("value")
     elif text_input:
         text_field = text_input[0]
         text_field.clear()
@@ -139,14 +152,13 @@ def complete_certification_test(driver, email):
                     print(f"Fuzzy matched '{question_text}' to '{best_match}' (score: {score})")
                 else:
                     print(f"No close match found for '{question_text}' (best score: {score}), using random answer...")
-                    logging.info(f"Question not in answers.json: '{question_text}' - Selecting random answer")
-                    # Check question type for random selection
                     radio_options = driver.find_elements(By.XPATH, "//input[@name='answers' and @type='radio']")
                     checkbox_options = driver.find_elements(By.XPATH, "//input[@name='answers' and @type='checkbox']")
                     dropdown = driver.find_elements(By.XPATH, "//select[@name='answers']")
                     text_input = driver.find_elements(By.XPATH, "//input[@name='answers']")
-                    random_answer = select_random_answer(radio_options, checkbox_options, dropdown, text_input)
-                    logging.info(f"Random answer selected: {random_answer}")
+                    available_options = get_available_options(radio_options, checkbox_options, dropdown, text_input)
+                    logging.info(f"Question not in answers.json: '{question_text}' - Available options: {available_options}")
+                    select_random_answer(radio_options, checkbox_options, dropdown, text_input)
                     time.sleep(1)
                     submit_button = driver.find_element(By.XPATH, "//button[contains(@class, 'btn--primary') and @type='submit']")
                     if submit_button.is_enabled():
@@ -165,42 +177,57 @@ def complete_certification_test(driver, email):
             text_input = driver.find_elements(By.XPATH, "//input[@name='answers']")
 
             # Validate answer type matches question type
-            if radio_options and not isinstance(answer, str):
-                logging.info(f"Answer type mismatch for '{question_text}': Expected string, got {type(answer).__name__} - Using random answer")
-                random_answer = select_random_answer(radio_options, [], [], [])
-                print(f"Selected random radio option '{random_answer}' due to type mismatch")
-            elif checkbox_options and not isinstance(answer, list):
-                logging.info(f"Answer type mismatch for '{question_text}': Expected list, got {type(answer).__name__} - Using random answer")
-                random_answer = select_random_answer([], checkbox_options, [], [])
-                print(f"Selected random checkbox options '{random_answer}' due to type mismatch")
-            elif dropdown and not isinstance(answer, str):
-                logging.info(f"Answer type mismatch for '{question_text}': Expected string, got {type(answer).__name__} - Using random answer")
-                random_answer = select_random_answer([], [], dropdown, [])
-                print(f"Selected random dropdown option '{random_answer}' due to type mismatch")
-            elif text_input and not isinstance(answer, str):
-                logging.info(f"Answer type mismatch for '{question_text}': Expected string, got {type(answer).__name__} - Using random answer")
-                random_answer = select_random_answer([], [], [], text_input)
-                print(f"Entered random text '{random_answer}' due to type mismatch")
-            else:
-                # Proceed with provided answer
-                if radio_options:
+            if radio_options:
+                if not isinstance(answer, str):
+                    logging.info(f"Answer type mismatch for '{question_text}': Expected string, got {type(answer).__name__} - Using random answer")
+                    random_answer = select_random_answer(radio_options, [], [], [])
+                    print(f"Selected random radio option '{random_answer}' due to type mismatch")
+                else:
+                    option_found = False
                     for option in radio_options:
                         value = option.get_attribute("value")
                         if value == answer:
                             option.click()
                             print(f"Selected radio option '{value}'")
+                            option_found = True
                             break
-                elif checkbox_options:
+                    if not option_found:
+                        available_options = get_available_options(radio_options, checkbox_options, dropdown, text_input)
+                        logging.info(f"Answer '{answer}' not found in radio options for '{question_text}' - Available options: {available_options} - Using random answer")
+                        random_answer = select_random_answer(radio_options, [], [], [])
+                        print(f"Selected random radio option '{random_answer}' due to answer not found")
+            elif checkbox_options:
+                if not isinstance(answer, list):
+                    logging.info(f"Answer type mismatch for '{question_text}': Expected list, got {type(answer).__name__} - Using random answer")
+                    random_answer = select_random_answer([], checkbox_options, [], [])
+                    print(f"Selected random checkbox options '{random_answer}' due to type mismatch")
+                else:
                     for option in checkbox_options:
                         value = option.get_attribute("value")
                         if value in answer:
                             option.click()
                             print(f"Selected checkbox option '{value}'")
-                elif dropdown:
-                    select = Select(dropdown[0])
-                    select.select_by_value(answer)
-                    print(f"Selected dropdown option '{answer}'")
-                elif text_input:
+            elif dropdown:
+                if not isinstance(answer, str):
+                    logging.info(f"Answer type mismatch for '{question_text}': Expected string, got {type(answer).__name__} - Using random answer")
+                    random_answer = select_random_answer([], [], dropdown, [])
+                    print(f"Selected random dropdown option '{random_answer}' due to type mismatch")
+                else:
+                    try:
+                        select = Select(dropdown[0])
+                        select.select_by_value(answer)
+                        print(f"Selected dropdown option '{answer}'")
+                    except Exception as e:
+                        available_options = get_available_options(radio_options, checkbox_options, dropdown, text_input)
+                        logging.info(f"Answer '{answer}' not found in dropdown for '{question_text}' - Available options: {available_options} - Using random answer")
+                        random_answer = select_random_answer([], [], dropdown, [])
+                        print(f"Selected random dropdown option '{random_answer}' due to answer not found: {e}")
+            elif text_input:
+                if not isinstance(answer, str):
+                    logging.info(f"Answer type mismatch for '{question_text}': Expected string, got {type(answer).__name__} - Using random answer")
+                    random_answer = select_random_answer([], [], [], text_input)
+                    print(f"Entered random text '{random_answer}' due to type mismatch")
+                else:
                     text_field = text_input[0]
                     text_field.clear()
                     text_field.send_keys(answer)
