@@ -58,7 +58,7 @@ with open("emails.txt", "w") as email_file:
 print(f"Generated {len(email_variations)} email variations and saved to emails.txt")
 
 # Step 2 & 3: Check if accounts.txt exists and decide between login or signup
-password = "Iloveindia123@"  # Hardcode your password here
+password = "Testpassword123@"  # Hardcode your password here
 accounts_file = "accounts.txt"
 
 def read_accounts(file_path):
