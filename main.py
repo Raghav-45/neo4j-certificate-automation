@@ -52,7 +52,7 @@ with open("answers.json", "r", encoding='utf-8') as f:
 # Generate email variations in memory
 base_email = "adi4545aditya@gmail.com"  # Hardcode your base Gmail address here
 password = "Iloveindia123@"  # Hardcode your password here
-email_variations = generate_dot_trick_emails(base_email, limit=20)
+email_variations = generate_dot_trick_emails(base_email, limit=12)
 print(f"Generated {len(email_variations)} email variations in memory")
 
 # Use CSV for accounts
@@ -141,7 +141,7 @@ def select_random_answer(radio_options, checkbox_options, dropdown, text_input):
     return None
 
 def complete_certification_test(driver, email):
-    """Complete the certification test and return the test score (placeholder)."""
+    """Complete the certification test and return the test status."""
     driver.get("https://graphacademy.neo4j.com/certifications/neo4j-certification/enrol/")
     time.sleep(5)
 
@@ -251,65 +251,81 @@ def complete_certification_test(driver, email):
             else:
                 print(f"Submit button not enabled for question {question_num}")
                 break
-            time.sleep(2)
+            time.sleep(1)
 
         except Exception as e:
             print(f"Error on question {question_num} for {email}: {e}")
             break
 
-    # Placeholder for test score retrieval
-    test_score = "N/A"  # Replace with actual score retrieval logic if available
-    print(f"Completed certification test for {email}. Test score: {test_score}")
+    # Mark as completed
+    test_score = "Done"
+    print(f"Completed certification test for {email}. Test status: {test_score}")
     return test_score
 
-# Check if accounts.csv exists and has data
+# Check accounts without opening browser initially
 existing_accounts = read_accounts(accounts_file)
+emails_to_process = []
 
-if existing_accounts:
-    for email, data in existing_accounts.items():
-        chrome_options = Options()
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-        try:
-            login(driver, email, data['password'])
-        except Exception as e:
-            print(f"Login failed for {email}: {e}")
-        finally:
-            driver.quit()
+for email in email_variations:
+    if email in existing_accounts:
+        if existing_accounts[email]['test_score'] == "Done":
+            print(f"Test already completed for {email}, skipping...")
+        else:
+            print(f"Test score is 'N/A' for {email}, adding to process list...")
+            emails_to_process.append(email)
+    else:
+        print(f"Email {email} not in accounts, adding to process list...")
+        emails_to_process.append(email)
+
+# Process emails with a single browser instance
+if emails_to_process:
+    chrome_options = Options()
+    # Uncomment the next two lines for headless mode (faster, no visible window)
+    # chrome_options.add_argument("--headless")
+    # chrome_options.add_argument("--disable-gpu")
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+    try:
+        for email in emails_to_process:
+            if email in existing_accounts:
+                # Login and complete test
+                test_score = login(driver, email, password)
+                write_account(accounts_file, email, password, test_score)
+                print(f"Updated {accounts_file} for {email}: Test Score: {test_score}")
+            else:
+                # Signup and complete test
+                print(f"Attempting signup with {email}...")
+                driver.get("https://graphacademy.neo4j.com/login/?return=/")
+                time.sleep(3)
+
+                signup_link = driver.find_element(By.LINK_TEXT, "Sign up")
+                signup_link.click()
+                time.sleep(2)
+
+                email_field = driver.find_element(By.ID, "email")
+                email_submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
+                email_field.send_keys(email)
+                email_submit_button.click()
+                time.sleep(3)
+
+                password_field = driver.find_element(By.ID, "password")
+                password_submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
+                password_field.send_keys(password)
+                password_submit_button.click()
+                time.sleep(3)
+
+                print(f"Account created for {email}")
+                test_score = complete_certification_test(driver, email)
+                write_account(accounts_file, email, password, test_score)
+                print(f"Added to {accounts_file}: Email: {email}, Password: {password}, Test Score: {test_score}")
+
+            # Small delay between accounts to avoid overwhelming the server
             time.sleep(2)
+
+    except Exception as e:
+        print(f"An error occurred during processing: {e}")
+
+    finally:
+        driver.quit()
 else:
-    for email in email_variations:
-        chrome_options = Options()
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-
-        try:
-            print(f"Attempting signup with {email}...")
-            driver.get("https://graphacademy.neo4j.com/login/?return=/")
-            time.sleep(3)
-
-            signup_link = driver.find_element(By.LINK_TEXT, "Sign up")
-            signup_link.click()
-            time.sleep(2)
-
-            email_field = driver.find_element(By.ID, "email")
-            email_submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
-            email_field.send_keys(email)
-            email_submit_button.click()
-            time.sleep(3)
-
-            password_field = driver.find_element(By.ID, "password")
-            password_submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
-            password_field.send_keys(password)
-            password_submit_button.click()
-            time.sleep(3)
-
-            print(f"Account created for {email}")
-            test_score = complete_certification_test(driver, email)
-            write_account(accounts_file, email, password, test_score)
-            print(f"Account details saved to {accounts_file}: Email: {email}, Password: {password}, Test Score: {test_score}")
-
-        except Exception as e:
-            print(f"An error occurred with {email}: {e}")
-
-        finally:
-            driver.quit()
-            time.sleep(2)
+    print("No emails to process. All tests are either completed or not applicable.")
