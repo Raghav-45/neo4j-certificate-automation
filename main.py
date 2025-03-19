@@ -50,9 +50,9 @@ with open("answers.json", "r", encoding='utf-8') as f:
     ANSWERS = json.load(f)
 
 # Generate email variations in memory
-base_email = "adi4545aditya@gmail.com"  # Hardcode your base Gmail address here
-password = "Iloveindia123@"  # Hardcode your password here
-email_variations = generate_dot_trick_emails(base_email, limit=12)
+base_email = "example@gmail.com"  # Hardcode your base Gmail address here
+password = "Testpassword123@"  # Hardcode your password here
+email_variations = generate_dot_trick_emails(base_email, limit=5)
 print(f"Generated {len(email_variations)} email variations in memory")
 
 # Use CSV for accounts
