@@ -10,6 +10,7 @@ import json
 from fuzzywuzzy import fuzz, process
 import random
 import logging
+import csv
 
 # Set up logging to a file
 logging.basicConfig(filename='log.txt', level=logging.INFO, 
@@ -48,31 +49,39 @@ def generate_dot_trick_emails(email: str, limit: int = 10):
 with open("answers.json", "r", encoding='utf-8') as f:
     ANSWERS = json.load(f)
 
-# Step 1: Generate and save email variations
+# Generate email variations in memory
 base_email = "adi4545aditya@gmail.com"  # Hardcode your base Gmail address here
-email_variations = generate_dot_trick_emails(base_email, limit=10)
+password = "Iloveindia123@"  # Hardcode your password here
+email_variations = generate_dot_trick_emails(base_email, limit=20)
+print(f"Generated {len(email_variations)} email variations in memory")
 
-with open("emails.txt", "w") as email_file:
-    for email in email_variations:
-        email_file.write(f"{email}\n")
-print(f"Generated {len(email_variations)} email variations and saved to emails.txt")
-
-# Step 2 & 3: Check if accounts.txt exists and decide between login or signup
-password = "Testpassword123@"  # Hardcode your password here
-accounts_file = "accounts.txt"
+# Use CSV for accounts
+accounts_file = "accounts.csv"
 
 def read_accounts(file_path):
+    """Read existing accounts from the CSV file."""
     accounts = {}
     if os.path.exists(file_path):
-        with open(file_path, "r") as file:
-            for line in file:
-                if "Email:" in line and "Password:" in line:
-                    email = line.split("Email: ")[1].split(",")[0].strip()
-                    pwd = line.split("Password: ")[1].strip()
-                    accounts[email] = pwd
+        with open(file_path, "r", newline='') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                accounts[row['email']] = {'password': row['password'], 'test_score': row['test_score']}
     return accounts
 
+def write_account(file_path, email, password, test_score="N/A"):
+    """Write or update an account in the CSV file."""
+    fieldnames = ['email', 'password', 'test_score']
+    accounts = read_accounts(file_path)
+    accounts[email] = {'password': password, 'test_score': test_score}
+    
+    with open(file_path, "w", newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        for email_key, data in accounts.items():
+            writer.writerow({'email': email_key, 'password': data['password'], 'test_score': data['test_score']})
+
 def login(driver, email, password):
+    """Attempt login with provided credentials."""
     print(f"Attempting login with {email}...")
     driver.get("https://graphacademy.neo4j.com/login/?return=/")
     time.sleep(3)
@@ -132,6 +141,7 @@ def select_random_answer(radio_options, checkbox_options, dropdown, text_input):
     return None
 
 def complete_certification_test(driver, email):
+    """Complete the certification test and return the test score (placeholder)."""
     driver.get("https://graphacademy.neo4j.com/certifications/neo4j-certification/enrol/")
     time.sleep(5)
 
@@ -247,18 +257,20 @@ def complete_certification_test(driver, email):
             print(f"Error on question {question_num} for {email}: {e}")
             break
 
-    print(f"Completed certification test for {email}.")
-    return True
+    # Placeholder for test score retrieval
+    test_score = "N/A"  # Replace with actual score retrieval logic if available
+    print(f"Completed certification test for {email}. Test score: {test_score}")
+    return test_score
 
-# Check if accounts.txt exists and has data
+# Check if accounts.csv exists and has data
 existing_accounts = read_accounts(accounts_file)
 
 if existing_accounts:
-    for email, pwd in existing_accounts.items():
+    for email, data in existing_accounts.items():
         chrome_options = Options()
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
         try:
-            login(driver, email, pwd)
+            login(driver, email, data['password'])
         except Exception as e:
             print(f"Login failed for {email}: {e}")
         finally:
@@ -290,11 +302,10 @@ else:
             password_submit_button.click()
             time.sleep(3)
 
-            with open(accounts_file, "a") as account_file:
-                account_file.write(f"Email: {email}, Password: {password}\n")
-            print(f"Account created for {email} and saved to accounts.txt")
-
-            complete_certification_test(driver, email)
+            print(f"Account created for {email}")
+            test_score = complete_certification_test(driver, email)
+            write_account(accounts_file, email, password, test_score)
+            print(f"Account details saved to {accounts_file}: Email: {email}, Password: {password}, Test Score: {test_score}")
 
         except Exception as e:
             print(f"An error occurred with {email}: {e}")
