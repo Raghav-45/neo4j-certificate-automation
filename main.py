@@ -16,7 +16,7 @@ import csv
 logging.basicConfig(filename='log.txt', level=logging.INFO, 
                     format='%(asctime)s - %(message)s', filemode='a')
 
-def generate_dot_trick_emails(email: str, limit: int = 10):
+def generate_dot_trick_emails(email: str, limit: int = 50):
     """
     Generate a list of email variations using the Gmail dot trick.
     """
@@ -46,14 +46,20 @@ def generate_dot_trick_emails(email: str, limit: int = 10):
     return result_emails
 
 # Load answers from JSON file
-with open("answers.json", "r", encoding='utf-8') as f:
-    ANSWERS = json.load(f)
+try:
+    with open("answers.json", "r", encoding='utf-8') as f:
+        ANSWERS = json.load(f)
+except FileNotFoundError:
+    logging.error("answers.json not found. Please ensure it exists in the directory.")
+    print("Error: answers.json not found. Exiting.")
+    exit(1)
 
 # Generate email variations in memory
-base_email = "example@gmail.com"  # Hardcode your base Gmail address here
+base_email = "adi4545aditya@gmail.com"  # Replace with your Gmail address
 password = "Testpassword123@"  # Hardcode your password here
-email_variations = generate_dot_trick_emails(base_email, limit=25)
+email_variations = generate_dot_trick_emails(base_email, limit=50)
 print(f"Generated {len(email_variations)} email variations in memory")
+logging.info(f"Generated {len(email_variations)} email variations in memory")
 
 # Use CSV for accounts
 accounts_file = "accounts.csv"
@@ -83,6 +89,7 @@ def write_account(file_path, email, password, test_score="N/A"):
 def login(driver, email, password):
     """Attempt login with provided credentials."""
     print(f"Attempting login with {email}...")
+    logging.info(f"Attempting login with {email}")
     driver.get("https://graphacademy.neo4j.com/login/?return=/")
     time.sleep(3)
 
@@ -142,11 +149,14 @@ def select_random_answer(radio_options, checkbox_options, dropdown, text_input):
 
 def complete_certification_test(driver, email):
     """Complete the certification test and return the test status."""
+    print(f"Starting certification test for {email}...")
+    logging.info(f"Starting certification test for {email}")
     driver.get("https://graphacademy.neo4j.com/certifications/neo4j-certification/enrol/")
     time.sleep(5)
 
     for question_num in range(1, 81):
         print(f"Answering question {question_num} for {email}...")
+        logging.info(f"Answering question {question_num} for {email}")
         try:
             # Get question text
             question_elem = driver.find_element(By.XPATH, "//div[@id='content']/p")
@@ -160,8 +170,10 @@ def complete_certification_test(driver, email):
                 if score >= 85:  # Threshold for similarity
                     answer = ANSWERS[best_match]
                     print(f"Fuzzy matched '{question_text}' to '{best_match}' (score: {score})")
+                    logging.info(f"Fuzzy matched '{question_text}' to '{best_match}' (score: {score})")
                 else:
                     print(f"No close match found for '{question_text}' (best score: {score}), using random answer...")
+                    logging.info(f"No close match found for '{question_text}' (best score: {score}), using random answer")
                     radio_options = driver.find_elements(By.XPATH, "//input[@name='answers' and @type='radio']")
                     checkbox_options = driver.find_elements(By.XPATH, "//input[@name='answers' and @type='checkbox']")
                     dropdown = driver.find_elements(By.XPATH, "//select[@name='answers']")
@@ -174,10 +186,12 @@ def complete_certification_test(driver, email):
                     if submit_button.is_enabled():
                         submit_button.click()
                         print(f"Submitted random answer for question {question_num}")
+                        logging.info(f"Submitted random answer for question {question_num}")
                     else:
                         print(f"Submit button not enabled for question {question_num}")
+                        logging.info(f"Submit button not enabled for question {question_num}")
                         break
-                    time.sleep(2)
+                    time.sleep(1)
                     continue
 
             # Check question type
@@ -199,6 +213,7 @@ def complete_certification_test(driver, email):
                         if value == answer:
                             option.click()
                             print(f"Selected radio option '{value}'")
+                            logging.info(f"Selected radio option '{value}'")
                             option_found = True
                             break
                     if not option_found:
@@ -217,6 +232,7 @@ def complete_certification_test(driver, email):
                         if value in answer:
                             option.click()
                             print(f"Selected checkbox option '{value}'")
+                            logging.info(f"Selected checkbox option '{value}'")
             elif dropdown:
                 if not isinstance(answer, str):
                     logging.info(f"Answer type mismatch for '{question_text}': Expected string, got {type(answer).__name__} - Using random answer")
@@ -227,6 +243,7 @@ def complete_certification_test(driver, email):
                         select = Select(dropdown[0])
                         select.select_by_value(answer)
                         print(f"Selected dropdown option '{answer}'")
+                        logging.info(f"Selected dropdown option '{answer}'")
                     except Exception as e:
                         available_options = get_available_options(radio_options, checkbox_options, dropdown, text_input)
                         logging.info(f"Answer '{answer}' not found in dropdown for '{question_text}' - Available options: {available_options} - Using random answer")
@@ -242,24 +259,29 @@ def complete_certification_test(driver, email):
                     text_field.clear()
                     text_field.send_keys(answer)
                     print(f"Entered text '{answer}'")
+                    logging.info(f"Entered text '{answer}'")
 
             time.sleep(1)
             submit_button = driver.find_element(By.XPATH, "//button[contains(@class, 'btn--primary') and @type='submit']")
             if submit_button.is_enabled():
                 submit_button.click()
                 print(f"Submitted answer for question {question_num}")
+                logging.info(f"Submitted answer for question {question_num}")
             else:
                 print(f"Submit button not enabled for question {question_num}")
+                logging.info(f"Submit button not enabled for question {question_num}")
                 break
             time.sleep(1)
 
         except Exception as e:
             print(f"Error on question {question_num} for {email}: {e}")
+            logging.error(f"Error on question {question_num} for {email}: {e}")
             break
 
     # Mark as completed
     test_score = "Done"
     print(f"Completed certification test for {email}. Test status: {test_score}")
+    logging.info(f"Completed certification test for {email}. Test status: {test_score}")
     return test_score
 
 # Check accounts without opening browser initially
@@ -270,31 +292,41 @@ for email in email_variations:
     if email in existing_accounts:
         if existing_accounts[email]['test_score'] == "Done":
             print(f"Test already completed for {email}, skipping...")
+            logging.info(f"Test already completed for {email}, skipping")
         else:
             print(f"Test score is 'N/A' for {email}, adding to process list...")
+            logging.info(f"Test score is 'N/A' for {email}, adding to process list")
             emails_to_process.append(email)
     else:
         print(f"Email {email} not in accounts, adding to process list...")
+        logging.info(f"Email {email} not in accounts, adding to process list")
         emails_to_process.append(email)
 
-# Process emails with a new browser instance for each
+# Process emails with a new browser instance for each in headless mode
 if emails_to_process:
     for email in emails_to_process:
         chrome_options = Options()
-        # Uncomment the next two lines for headless mode (faster, no visible window)
-        # chrome_options.add_argument("--headless")
-        # chrome_options.add_argument("--disable-gpu")
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+        # Enable headless mode for terminal-only environment
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--no-sandbox")  # Required for many Linux environments like Digital Ocean
+        chrome_options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource issues in VMs
 
         try:
+            driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+            print(f"Initialized headless Chrome for {email}")
+            logging.info(f"Initialized headless Chrome for {email}")
+
             if email in existing_accounts:
                 # Login and complete test
                 test_score = login(driver, email, password)
                 write_account(accounts_file, email, password, test_score)
                 print(f"Updated {accounts_file} for {email}: Test Score: {test_score}")
+                logging.info(f"Updated {accounts_file} for {email}: Test Score: {test_score}")
             else:
                 # Signup and complete test
                 print(f"Attempting signup with {email}...")
+                logging.info(f"Attempting signup with {email}")
                 driver.get("https://graphacademy.neo4j.com/login/?return=/")
                 time.sleep(3)
 
@@ -315,15 +347,21 @@ if emails_to_process:
                 time.sleep(3)
 
                 print(f"Account created for {email}")
+                logging.info(f"Account created for {email}")
                 test_score = complete_certification_test(driver, email)
                 write_account(accounts_file, email, password, test_score)
                 print(f"Added to {accounts_file}: Email: {email}, Password: {password}, Test Score: {test_score}")
+                logging.info(f"Added to {accounts_file}: Email: {email}, Password: {password}, Test Score: {test_score}")
 
         except Exception as e:
             print(f"An error occurred with {email}: {e}")
+            logging.error(f"An error occurred with {email}: {e}")
 
         finally:
             driver.quit()
+            print(f"Closed headless Chrome for {email}")
+            logging.info(f"Closed headless Chrome for {email}")
             time.sleep(2)  # Delay between instances to avoid overlap
 else:
     print("No emails to process. All tests are either completed or not applicable.")
+    logging.info("No emails to process. All tests are either completed or not applicable.")
