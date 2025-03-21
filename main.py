@@ -1,25 +1,71 @@
+# First, install dependencies before any imports that require them
+import os
+import subprocess
+
+def install_dependencies():
+    """Install Chrome, ChromeDriver, and Python dependencies if not already installed."""
+    # Check if Chrome is installed
+    if not os.path.exists("/usr/bin/google-chrome"):
+        print("Installing Google Chrome...")
+        subprocess.run(["apt-get", "update"], check=True)
+        subprocess.run(["apt-get", "install", "-y", "wget", "unzip", "libglib2.0-0", "libnss3", "libgconf-2-4", "libfontconfig1"], check=True)
+        subprocess.run(["wget", "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"], check=True)
+        subprocess.run(["dpkg", "-i", "google-chrome-stable_current_amd64.deb"], check=False)
+        subprocess.run(["apt-get", "-f", "install", "-y"], check=True)
+        subprocess.run(["rm", "google-chrome-stable_current_amd64.deb"], check=True)
+    
+    # Get Chrome version
+    chrome_version = subprocess.check_output(["google-chrome", "--version"]).decode().strip()
+    print(f"Detected Chrome version: {chrome_version}")
+    chrome_major_version = int(chrome_version.split()[2].split('.')[0])
+
+    # Check if ChromeDriver is installed and compatible
+    chromedriver_path = "/usr/local/bin/chromedriver"
+    if os.path.exists(chromedriver_path):
+        chromedriver_version = subprocess.check_output([chromedriver_path, "--version"]).decode().strip()
+        chromedriver_major_version = int(chromedriver_version.split()[1].split('.')[0])
+        if chromedriver_major_version == chrome_major_version:
+            print(f"ChromeDriver {chromedriver_version} is compatible with Chrome {chrome_version}")
+        else:
+            print("ChromeDriver version mismatch, reinstalling...")
+            os.remove(chromedriver_path)
+    else:
+        print("ChromeDriver not found, installing...")
+
+    if not os.path.exists(chromedriver_path):
+        chromedriver_url = f"https://storage.googleapis.com/chrome-for-testing-public/{chrome_major_version}.0.6998.90/linux64/chromedriver-linux64.zip"
+        subprocess.run(["wget", chromedriver_url], check=True)
+        subprocess.run(["unzip", "chromedriver-linux64.zip", "-d", "/usr/local/bin/"], check=True)
+        subprocess.run(["mv", "/usr/local/bin/chromedriver-linux64/chromedriver", chromedriver_path], check=True)
+        subprocess.run(["rm", "-rf", "chromedriver-linux64", "chromedriver-linux64.zip"], check=True)
+        print(f"Installed ChromeDriver for Chrome {chrome_major_version}")
+
+    # Install Python dependencies
+    print("Installing Python dependencies...")
+    subprocess.run(["pip", "install", "selenium", "fuzzywuzzy", "python-Levenshtein"], check=True)
+
+# Run installation before imports
+install_dependencies()
+
+# Now safe to import external packages
+import time
+import json
+import random
+import logging
+import csv
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import Select
-import time
-import os
-import json
 from fuzzywuzzy import fuzz, process
-import random
-import logging
-import csv
 
 # Set up logging to a file
 logging.basicConfig(filename='log.txt', level=logging.INFO, 
                     format='%(asctime)s - %(message)s', filemode='a')
 
 def generate_dot_trick_emails(email: str, limit: int = 50):
-    """
-    Generate a list of email variations using the Gmail dot trick.
-    """
+    """Generate a list of email variations using the Gmail dot trick."""
     if "@" not in email:
         raise ValueError("Invalid email address")
 
@@ -44,25 +90,6 @@ def generate_dot_trick_emails(email: str, limit: int = 50):
     result_emails = [f"{variation}@{domain}" for variation in unique_variations[:limit]]
     
     return result_emails
-
-# Load answers from JSON file
-try:
-    with open("answers.json", "r", encoding='utf-8') as f:
-        ANSWERS = json.load(f)
-except FileNotFoundError:
-    logging.error("answers.json not found. Please ensure it exists in the directory.")
-    print("Error: answers.json not found. Exiting.")
-    exit(1)
-
-# Generate email variations in memory
-base_email = "adi4545aditya@gmail.com"  # Replace with your Gmail address
-password = "Testpassword123@"  # Hardcode your password here
-email_variations = generate_dot_trick_emails(base_email, limit=50)
-print(f"Generated {len(email_variations)} email variations in memory")
-logging.info(f"Generated {len(email_variations)} email variations in memory")
-
-# Use CSV for accounts
-accounts_file = "accounts.csv"
 
 def read_accounts(file_path):
     """Read existing accounts from the CSV file."""
@@ -158,16 +185,13 @@ def complete_certification_test(driver, email):
         print(f"Answering question {question_num} for {email}...")
         logging.info(f"Answering question {question_num} for {email}")
         try:
-            # Get question text
             question_elem = driver.find_element(By.XPATH, "//div[@id='content']/p")
             question_text = question_elem.text.strip()
 
-            # Look up answer with fuzzy matching
             answer = ANSWERS.get(question_text, None)
             if not answer:
-                # Fuzzy match if exact match fails
                 best_match, score = process.extractOne(question_text, ANSWERS.keys(), scorer=fuzz.token_sort_ratio)
-                if score >= 85:  # Threshold for similarity
+                if score >= 85:
                     answer = ANSWERS[best_match]
                     print(f"Fuzzy matched '{question_text}' to '{best_match}' (score: {score})")
                     logging.info(f"Fuzzy matched '{question_text}' to '{best_match}' (score: {score})")
@@ -194,13 +218,11 @@ def complete_certification_test(driver, email):
                     time.sleep(1)
                     continue
 
-            # Check question type
             radio_options = driver.find_elements(By.XPATH, "//input[@name='answers' and @type='radio']")
             checkbox_options = driver.find_elements(By.XPATH, "//input[@name='answers' and @type='checkbox']")
             dropdown = driver.find_elements(By.XPATH, "//select[@name='answers']")
             text_input = driver.find_elements(By.XPATH, "//input[@name='answers']")
 
-            # Validate answer type matches question type
             if radio_options:
                 if not isinstance(answer, str):
                     logging.info(f"Answer type mismatch for '{question_text}': Expected string, got {type(answer).__name__} - Using random answer")
@@ -278,90 +300,121 @@ def complete_certification_test(driver, email):
             logging.error(f"Error on question {question_num} for {email}: {e}")
             break
 
-    # Mark as completed
     test_score = "Done"
     print(f"Completed certification test for {email}. Test status: {test_score}")
     logging.info(f"Completed certification test for {email}. Test status: {test_score}")
     return test_score
 
-# Check accounts without opening browser initially
-existing_accounts = read_accounts(accounts_file)
-emails_to_process = []
+if __name__ == "__main__":
+    # Check for answers.json
+    if not os.path.exists("answers.json"):
+        print("Please upload answers.json to Colab before running.")
+        logging.error("answers.json not found. Please upload it.")
+        from google.colab import files
+        uploaded = files.upload()
+        if "answers.json" not in uploaded:
+            print("Error: answers.json not uploaded. Exiting.")
+            logging.error("Error: answers.json not uploaded. Exiting.")
+            exit(1)
 
-for email in email_variations:
-    if email in existing_accounts:
-        if existing_accounts[email]['test_score'] == "Done":
-            print(f"Test already completed for {email}, skipping...")
-            logging.info(f"Test already completed for {email}, skipping")
-        else:
-            print(f"Test score is 'N/A' for {email}, adding to process list...")
-            logging.info(f"Test score is 'N/A' for {email}, adding to process list")
-            emails_to_process.append(email)
-    else:
-        print(f"Email {email} not in accounts, adding to process list...")
-        logging.info(f"Email {email} not in accounts, adding to process list")
-        emails_to_process.append(email)
+    # Load answers from JSON file
+    with open("answers.json", "r", encoding='utf-8') as f:
+        ANSWERS = json.load(f)
 
-# Process emails with a new browser instance for each in headless mode
-if emails_to_process:
-    for email in emails_to_process:
-        chrome_options = Options()
-        # Enable headless mode for terminal-only environment
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--no-sandbox")  # Required for many Linux environments like Digital Ocean
-        chrome_options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource issues in VMs
+    # Generate email variations
+    base_email = "adi4545aditya@gmail.com"  # Replace with your Gmail address
+    password = "Testpassword123@"  # Hardcode your password here
+    email_variations = generate_dot_trick_emails(base_email, limit=50)
+    print(f"Generated {len(email_variations)} email variations in memory")
+    logging.info(f"Generated {len(email_variations)} email variations in memory")
 
-        try:
-            driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-            print(f"Initialized headless Chrome for {email}")
-            logging.info(f"Initialized headless Chrome for {email}")
+    # Use CSV for accounts
+    accounts_file = "accounts.csv"
 
-            if email in existing_accounts:
-                # Login and complete test
-                test_score = login(driver, email, password)
-                write_account(accounts_file, email, password, test_score)
-                print(f"Updated {accounts_file} for {email}: Test Score: {test_score}")
-                logging.info(f"Updated {accounts_file} for {email}: Test Score: {test_score}")
+    # Check accounts
+    existing_accounts = read_accounts(accounts_file)
+    emails_to_process = []
+
+    for email in email_variations:
+        if email in existing_accounts:
+            if existing_accounts[email]['test_score'] == "Done":
+                print(f"Test already completed for {email}, skipping...")
+                logging.info(f"Test already completed for {email}, skipping")
             else:
-                # Signup and complete test
-                print(f"Attempting signup with {email}...")
-                logging.info(f"Attempting signup with {email}")
-                driver.get("https://graphacademy.neo4j.com/login/?return=/")
-                time.sleep(3)
+                print(f"Test score is 'N/A' for {email}, adding to process list...")
+                logging.info(f"Test score is 'N/A' for {email}, adding to process list")
+                emails_to_process.append(email)
+        else:
+            print(f"Email {email} not in accounts, adding to process list...")
+            logging.info(f"Email {email} not in accounts, adding to process list")
+            emails_to_process.append(email)
 
-                signup_link = driver.find_element(By.LINK_TEXT, "Sign up")
-                signup_link.click()
+    # Process emails
+    if emails_to_process:
+        for email in emails_to_process:
+            chrome_options = Options()
+            chrome_options.add_argument("--headless")
+            chrome_options.add_argument("--disable-gpu")
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            chrome_options.binary_location = "/usr/bin/google-chrome"
+
+            driver = None
+            try:
+                driver = webdriver.Chrome(service=Service("/usr/local/bin/chromedriver"), options=chrome_options)
+                print(f"Initialized headless Chrome for {email}")
+                logging.info(f"Initialized headless Chrome for {email}")
+
+                if email in existing_accounts:
+                    test_score = login(driver, email, password)
+                    write_account(accounts_file, email, password, test_score)
+                    print(f"Updated {accounts_file} for {email}: Test Score: {test_score}")
+                    logging.info(f"Updated {accounts_file} for {email}: Test Score: {test_score}")
+                else:
+                    print(f"Attempting signup with {email}...")
+                    logging.info(f"Attempting signup with {email}")
+                    driver.get("https://graphacademy.neo4j.com/login/?return=/")
+                    time.sleep(3)
+
+                    signup_link = driver.find_element(By.LINK_TEXT, "Sign up")
+                    signup_link.click()
+                    time.sleep(2)
+
+                    email_field = driver.find_element(By.ID, "email")
+                    email_submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
+                    email_field.send_keys(email)
+                    email_submit_button.click()
+                    time.sleep(3)
+
+                    password_field = driver.find_element(By.ID, "password")
+                    password_submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
+                    password_field.send_keys(password)
+                    password_submit_button.click()
+                    time.sleep(3)
+
+                    print(f"Account created for {email}")
+                    logging.info(f"Account created for {email}")
+                    test_score = complete_certification_test(driver, email)
+                    write_account(accounts_file, email, password, test_score)
+                    print(f"Added to {accounts_file}: Email: {email}, Password: {password}, Test Score: {test_score}")
+                    logging.info(f"Added to {accounts_file}: Email: {email}, Password: {password}, Test Score: {test_score}")
+
+            except Exception as e:
+                print(f"An error occurred with {email}: {e}")
+                logging.error(f"An error occurred with {email}: {e}")
+
+            finally:
+                if driver is not None:
+                    driver.quit()
+                print(f"Closed headless Chrome for {email}")
+                logging.info(f"Closed headless Chrome for {email}")
                 time.sleep(2)
 
-                email_field = driver.find_element(By.ID, "email")
-                email_submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
-                email_field.send_keys(email)
-                email_submit_button.click()
-                time.sleep(3)
+    else:
+        print("No emails to process. All tests are either completed or not applicable.")
+        logging.info("No emails to process. All tests are either completed or not applicable.")
 
-                password_field = driver.find_element(By.ID, "password")
-                password_submit_button = driver.find_element(By.XPATH, "//button[@type='submit']")
-                password_field.send_keys(password)
-                password_submit_button.click()
-                time.sleep(3)
-
-                print(f"Account created for {email}")
-                logging.info(f"Account created for {email}")
-                test_score = complete_certification_test(driver, email)
-                write_account(accounts_file, email, password, test_score)
-                print(f"Added to {accounts_file}: Email: {email}, Password: {password}, Test Score: {test_score}")
-                logging.info(f"Added to {accounts_file}: Email: {email}, Password: {password}, Test Score: {test_score}")
-
-        except Exception as e:
-            print(f"An error occurred with {email}: {e}")
-            logging.error(f"An error occurred with {email}: {e}")
-
-        finally:
-            driver.quit()
-            print(f"Closed headless Chrome for {email}")
-            logging.info(f"Closed headless Chrome for {email}")
-            time.sleep(2)  # Delay between instances to avoid overlap
-else:
-    print("No emails to process. All tests are either completed or not applicable.")
-    logging.info("No emails to process. All tests are either completed or not applicable.")
+    # Download results
+    from google.colab import files
+    files.download('accounts.csv')
+    files.download('log.txt')
