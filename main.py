@@ -52,7 +52,7 @@ with open("answers.json", "r", encoding='utf-8') as f:
 # Generate email variations in memory
 base_email = "example@gmail.com"  # Hardcode your base Gmail address here
 password = "Testpassword123@"  # Hardcode your password here
-email_variations = generate_dot_trick_emails(base_email, limit=5)
+email_variations = generate_dot_trick_emails(base_email, limit=25)
 print(f"Generated {len(email_variations)} email variations in memory")
 
 # Use CSV for accounts
@@ -277,16 +277,16 @@ for email in email_variations:
         print(f"Email {email} not in accounts, adding to process list...")
         emails_to_process.append(email)
 
-# Process emails with a single browser instance
+# Process emails with a new browser instance for each
 if emails_to_process:
-    chrome_options = Options()
-    # Uncomment the next two lines for headless mode (faster, no visible window)
-    # chrome_options.add_argument("--headless")
-    # chrome_options.add_argument("--disable-gpu")
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    for email in emails_to_process:
+        chrome_options = Options()
+        # Uncomment the next two lines for headless mode (faster, no visible window)
+        # chrome_options.add_argument("--headless")
+        # chrome_options.add_argument("--disable-gpu")
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
-    try:
-        for email in emails_to_process:
+        try:
             if email in existing_accounts:
                 # Login and complete test
                 test_score = login(driver, email, password)
@@ -319,13 +319,11 @@ if emails_to_process:
                 write_account(accounts_file, email, password, test_score)
                 print(f"Added to {accounts_file}: Email: {email}, Password: {password}, Test Score: {test_score}")
 
-            # Small delay between accounts to avoid overwhelming the server
-            time.sleep(2)
+        except Exception as e:
+            print(f"An error occurred with {email}: {e}")
 
-    except Exception as e:
-        print(f"An error occurred during processing: {e}")
-
-    finally:
-        driver.quit()
+        finally:
+            driver.quit()
+            time.sleep(2)  # Delay between instances to avoid overlap
 else:
     print("No emails to process. All tests are either completed or not applicable.")
