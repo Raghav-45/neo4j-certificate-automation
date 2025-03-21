@@ -322,9 +322,9 @@ if __name__ == "__main__":
         ANSWERS = json.load(f)
 
     # Generate email variations
-    base_email = "adi4545aditya@gmail.com"  # Replace with your Gmail address
+    base_email = "example@gmail.com"  # Replace with your Gmail address
     password = "Testpassword123@"  # Hardcode your password here
-    email_variations = generate_dot_trick_emails(base_email, limit=50)
+    email_variations = generate_dot_trick_emails(base_email, limit=25)
     print(f"Generated {len(email_variations)} email variations in memory")
     logging.info(f"Generated {len(email_variations)} email variations in memory")
 
